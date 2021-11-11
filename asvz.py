@@ -1,4 +1,6 @@
 import argparse
+import re
+import datetime
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.wait import WebDriverWait
@@ -47,6 +49,8 @@ class ASVZ:
             )
             .get_attribute("type")
         )
+
+        print(status)
         if status == "success":
             print("successfully enrolled in lesson")
         else:
@@ -66,7 +70,18 @@ class ASVZ:
 
         except Exception as e:
             print(e)
+        finally:
             self.driver.close()
+
+    def get_enrollment_time(self, lesson_id):
+        lesson_url = f"https://schalter.asvz.ch/tn/lessons/{lesson_id}"
+        self.driver.get(lesson_url)
+        enrollment_elem = self.driver.find_element(
+            By.XPATH,
+            "//app-lesson-properties-display/dl/dt[text()='Anmeldezeitraum']/following-sibling::dd",
+        )
+        matcher = re.search(r"\d+.\d+.\d+\s\d+:\d+", enrollment_elem)
+        return datetime.datetime.strptime(matcher.group(0), "%d.%m.%Y %H:%M")
 
 
 if __name__ == "__main__":
@@ -78,8 +93,8 @@ if __name__ == "__main__":
         help="ID of a particular lesson e.g. 200949 in https://schalter.asvz.ch/tn/lessons/200949",
     )
 
-    parser.add_argument("-u", "--username", type=str, help="Organisation username")
-    parser.add_argument("-p", "--password", type=str, help="Organisation password")
+    parser.add_argument("-u", "--username", type=str, help="NETHZ username")
+    parser.add_argument("-p", "--password", type=str, help="NETHZ password")
 
     args = parser.parse_args()
     asvz_enroller = ASVZ(args.username, args.password)
