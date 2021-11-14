@@ -58,13 +58,14 @@ class ASVZ:
         else:
             print("something went wrong, please check the status of your enrollment")
 
-    def _load_credentials(self, credentials_path):
-        yaml_file = open(credentials_path, "r")
+    def _load_credentials(self, credentials_file):
+        file_path = os.path.join(os.path.dirname(__file__), credentials_file)
+        yaml_file = open(file_path, "r")
         yaml_content = yaml.safe_load(yaml_file)
         return yaml_content.get("username"), yaml_content.get("password")
 
-    def register_for_lesson(self, lesson_id, credentials_path="credentials.yml"):
-        username, password = self._load_credentials(credentials_path)
+    def register_for_lesson(self, lesson_id, credentials_file="credentials.yml"):
+        username, password = self._load_credentials(credentials_file)
 
         if not self.interactive and not (username and password):
             sys.exit(
