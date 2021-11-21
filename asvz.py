@@ -145,7 +145,7 @@ class ASVZ:
         python_path = os.path.join(self.dir_name, ".env/bin/python3")
         asvz_path = os.path.join(self.dir_name, "asvz.py")
 
-        job = cron.new(command=" ".join(python_path, asvz_path, lesson_id))
+        job = cron.new(command=" ".join(python_path, asvz_path, str(lesson_id)))
         job.setall(start_time)
         cron.write()
 
