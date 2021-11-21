@@ -1,3 +1,4 @@
 .env
 credentials.yml
 __pycache__
+*.log

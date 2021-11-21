@@ -3,6 +3,7 @@ import datetime
 import re
 import os, sys
 import yaml
+import logging
 
 from crontab import CronTab
 from selenium.webdriver import Chrome
@@ -21,7 +22,27 @@ class ASVZ:
         self.driver = Chrome(options=opts)
         self.interactive = interactive
 
+        self.dir_name = os.path.dirname(os.path.abspath(__file__))
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+        c_handler = logging.StreamHandler()
+        f_handler = logging.FileHandler(os.path.join(self.dir_name, "asvz.log"))
+
+        # Create formatters and add it to handlers
+        c_format = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
+        f_format = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        c_handler.setFormatter(c_format)
+        f_handler.setFormatter(f_format)
+
+        # Add handlers to the logger
+        self.logger.addHandler(c_handler)
+        self.logger.addHandler(f_handler)
+
     def _login(self, username, password):
+        self.logger.debug("trying to log in")
         WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.NAME, "provider"))
         ).click()
@@ -36,11 +57,28 @@ class ASVZ:
             ).send_keys(username)
             self.driver.find_element(By.ID, "password").send_keys(password)
             self.driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        self.logger.debug("login successful")
 
     def _enroll(self):
-        WebDriverWait(self.driver, 5 * 60).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@id='btnRegister']"))
-        ).click()
+        self.logger.debug("enroll in lesson")
+        WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//button[@id='btnRegister']"))
+        )
+        enrollment_elem = self.driver.find_element(
+            By.XPATH,
+            "//app-lesson-properties-display/dl/dt[text()='Anmeldezeitraum']/following-sibling::dd",
+        )
+        matcher = re.search(r"\d+.\d+.\d+\s\d+:\d+", enrollment_elem.text)
+        enrollment_time =  datetime.datetime.strptime(matcher.group(0), "%d.%m.%Y %H:%M")
+        if enrollment_time - datetime.datetime.now() > datetime.timedelta(minutes=10):
+            self.logger.error("Cannot enroll in lesson more than 10 minutes before enrollment starts")
+            sys.exit("Please start script with -c flag to generate a cronjob")
+
+        self.logger.debug("wait until enrollment is open")
+        while enrollment_time > datetime.datetime.now():
+            pass
+
+        # self.driver.find_element(By.XPATH, "//button[@id='btnRegister']").click()
 
         status = (
             WebDriverWait(self.driver, 60)
@@ -54,9 +92,9 @@ class ASVZ:
         )
 
         if status == "success":
-            print("successfully enrolled in lesson")
+            self.logger.info("successfully enrolled in lesson")
         else:
-            print("something went wrong, please check the status of your enrollment")
+            self.logger.error("something went wrong, please check the status of your enrollment (status: {})".format(status))
 
     def _load_credentials(self, credentials_file):
         file_path = os.path.join(os.path.dirname(__file__), credentials_file)
@@ -73,7 +111,7 @@ class ASVZ:
             )
 
         try:
-            lesson_url = f"https://schalter.asvz.ch/tn/lessons/{lesson_id}"
+            lesson_url = "https://schalter.asvz.ch/tn/lessons/{}".format(lesson_id)
             self.driver.get(lesson_url)
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located(
@@ -84,18 +122,18 @@ class ASVZ:
             self._enroll()
 
         except Exception as e:
-            print(e)
+            self.logger.error(e)
         finally:
             self.driver.close()
 
     def get_enrollment_time(self, lesson_id):
-        lesson_url = f"https://schalter.asvz.ch/tn/lessons/{lesson_id}"
+        lesson_url = "https://schalter.asvz.ch/tn/lessons/{}".format(lesson_id)
         self.driver.get(lesson_url)
         enrollment_elem = self.driver.find_element(
             By.XPATH,
             "//app-lesson-properties-display/dl/dt[text()='Anmeldezeitraum']/following-sibling::dd",
         )
-        matcher = re.search(r"\d+.\d+.\d+\s\d+:\d+", enrollment_elem)
+        matcher = re.search(r"\d+.\d+.\d+\s\d+:\d+", enrollment_elem.text)
         return datetime.datetime.strptime(matcher.group(0), "%d.%m.%Y %H:%M")
 
     def generate_cronjob(self, lesson_id):
@@ -104,9 +142,8 @@ class ASVZ:
         cron = CronTab(user=True)
         start_time = enrollment_time + datetime.timedelta(minutes=-3)
 
-        dir_name = os.path.dirname(os.path.abspath(__file__))
-        python_path = os.path.join(dir_name, ".env/bin/python3")
-        asvz_path = os.path.join(dir_name, "asvz.py")
+        python_path = os.path.join(self.dir_name, ".env/bin/python3")
+        asvz_path = os.path.join(self.dir_name, "asvz.py")
 
         job = cron.new(command=" ".join(python_path, asvz_path, lesson_id))
         job.setall(start_time)
