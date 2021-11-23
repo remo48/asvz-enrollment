@@ -61,7 +61,7 @@ class ASVZ:
 
     def _enroll(self):
         self.logger.debug("enroll in lesson")
-        WebDriverWait(self.driver, 10).until(
+        WebDriverWait(self.driver, 60).until(
             EC.presence_of_element_located((By.XPATH, "//button[@id='btnRegister']"))
         )
         enrollment_elem = self.driver.find_element(
@@ -78,7 +78,7 @@ class ASVZ:
         while enrollment_time > datetime.datetime.now():
             pass
 
-        # self.driver.find_element(By.XPATH, "//button[@id='btnRegister']").click()
+        self.driver.find_element(By.XPATH, "//button[@id='btnRegister']").click()
 
         status = (
             WebDriverWait(self.driver, 60)
@@ -137,6 +137,7 @@ class ASVZ:
         return datetime.datetime.strptime(matcher.group(0), "%d.%m.%Y %H:%M")
 
     def generate_cronjob(self, lesson_id):
+        self.logger("generate cronjob for enrollment")
         enrollment_time = self.get_enrollment_time(lesson_id)
 
         cron = CronTab(user=True)
@@ -145,9 +146,10 @@ class ASVZ:
         python_path = os.path.join(self.dir_name, ".env/bin/python3")
         asvz_path = os.path.join(self.dir_name, "asvz.py")
 
-        job = cron.new(command=" ".join(python_path, asvz_path, str(lesson_id)))
+        job = cron.new(command=" ".join([python_path, asvz_path, str(lesson_id)]))
         job.setall(start_time)
         cron.write()
+        self.logger("successfully created cronjob")
 
 
 if __name__ == "__main__":
