@@ -49,13 +49,16 @@ class ASVZ:
         self.timeout = timeout
         self.frequency = frequency
 
-        self.credentials_file = credentials_file
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        log_file = os.path.join(current_dir, 'asvz.log')
+        self.credentials_file = os.path.join(current_dir, credentials_file)
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         c_handler = logging.StreamHandler()
         c_handler.setLevel(logging.DEBUG)
-        f_handler = logging.FileHandler("asvz.log")
+        f_handler = logging.FileHandler(log_file)
         f_handler.setLevel(logging.DEBUG)
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         c_handler.setFormatter(formatter)
@@ -123,10 +126,15 @@ class ASVZ:
 
         python_path = os.path.join(current_dir, ".env/bin/python3")
         job = cron.new(
-            command=" ".join([python_path, os.path.abspath(__file__), str(lesson_id)])
+            command=" ".join([python_path, os.path.abspath(__file__), str(lesson_id)]),
+            comment=str(lesson_id)
         )
         job.setall(start_time)
         cron.write()
+
+    def _cleanup_crontab(self, lesson_id):
+        cron = CronTab(user=True)
+        cron.remove_all(comment=str(lesson_id))
 
     def _enroll_internal(self, lesson_id):
         if not self.access_token or datetime.now() > self.expires:
@@ -143,6 +151,7 @@ class ASVZ:
                 "Einschreibung erfolgreich, Platz-Nr. %d",
                 res_json["data"]["placeNumber"],
             )
+            self._cleanup_crontab(lesson_id)
         elif res.status_code == 401:
             self.logger.warning("Login ungültig - wird aktualisiert")
             self._refresh_access_token()
