@@ -23,8 +23,7 @@ def wait_until(timestamp):
 
     if isinstance(timestamp, datetime):
         end = timestamp.timestamp()
-
-    if not isinstance(timestamp, (int, float)):
+    elif not isinstance(timestamp, (int, float)):
         raise AttributeError(
             "The timestamp parameter is not a number or datetime object"
         )
