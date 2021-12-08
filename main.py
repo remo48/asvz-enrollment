@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from urllib import parse
 from crontab import CronTab
+from dateutil.parser import parse
 
 import argparse
 import logging
@@ -48,9 +49,8 @@ class ASVZ:
         self.timeout = timeout
         self.frequency = frequency
 
-
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        log_file = os.path.join(current_dir, 'asvz.log')
+        log_file = os.path.join(current_dir, "asvz.log")
         self.credentials_file = os.path.join(current_dir, credentials_file)
 
         self.logger = logging.getLogger(__name__)
@@ -118,6 +118,20 @@ class ASVZ:
         else:
             self._create_cronjob(lesson_id, enrollment_from)
 
+    def get_profile_information(self):
+        if not self.access_token:
+            self._refresh_access_token()
+
+        url = "https://schalter.asvz.ch/tn-api/api/MemberPerson"
+        bearer = "Bearer {}".format(self.access_token)
+        headers = {"Authorization": bearer}
+        res = self.session.get(url, headers=headers)
+        res_json = res.json()
+        if res.status_code == 200:
+            return res_json
+        else:
+            return None
+
     def _create_cronjob(self, lesson_id, enrollment_from):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         cron = CronTab(user=True)
@@ -126,7 +140,7 @@ class ASVZ:
         python_path = os.path.join(current_dir, ".env/bin/python3")
         job = cron.new(
             command=" ".join([python_path, os.path.abspath(__file__), str(lesson_id)]),
-            comment=str(lesson_id)
+            comment=str(lesson_id),
         )
         job.setall(start_time)
         cron.write()
@@ -206,14 +220,8 @@ class ASVZ:
         return data
 
     def _extract_enrollment_time(self, data):
-        enrollment_from = datetime.strptime(
-            data["enrollmentFrom"], "%Y-%m-%dT%H:%M:%S%z"
-        ).replace(
-            tzinfo=None
-        )  # requires python >= 3.7
-        enrollment_until = datetime.strptime(
-            data["enrollmentUntil"], "%Y-%m-%dT%H:%M:%S%z"
-        ).replace(tzinfo=None)
+        enrollment_from = parse(data["enrollmentFrom"]).replace(tzinfo=None)
+        enrollment_until = parse(data["enrollmentUntil"]).replace(tzinfo=None)
         return enrollment_from, enrollment_until
 
     def _load_identity(self):
@@ -244,6 +252,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "lesson_id",
+        nargs='?',
         type=int,
         help="ID of a particular lesson e.g. 200949 in https://schalter.asvz.ch/tn/lessons/200949",
     )
@@ -271,6 +280,12 @@ if __name__ == "__main__":
         help="Time(s) between lesson status requests",
     )
 
+    parser.add_argument(
+        "--test",
+        action='store_true',
+        help="Test if everything is set up correct"
+    )
+
     args = parser.parse_args()
     lesson_id = args.lesson_id
 
@@ -279,4 +294,14 @@ if __name__ == "__main__":
         timeout=args.timeout,
         frequency=args.frequency,
     )
-    asvz.enroll(lesson_id)
+
+    if args.test:
+        profile_data = asvz.get_profile_information()
+        if profile_data:
+            print("Login erfolgreich: ({} {}, {})".format(profile_data['firstName'], profile_data['lastName'], profile_data['emailPrivate']))
+        else:
+            print("Irgendetwas scheint nicht zu funktionieren. Überprüfe, ob die Credentials korrekt gesetzt sind")
+    elif lesson_id:
+        asvz.enroll(lesson_id)
+    else:
+        parser.print_help()
