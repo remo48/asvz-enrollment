@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta
 from urllib import parse
 from crontab import CronTab
-from dateutil.parser import parse
+from dateutil.parser import parse as parse_date
 
 import argparse
 import logging
@@ -220,8 +220,8 @@ class ASVZ:
         return data
 
     def _extract_enrollment_time(self, data):
-        enrollment_from = parse(data["enrollmentFrom"]).replace(tzinfo=None)
-        enrollment_until = parse(data["enrollmentUntil"]).replace(tzinfo=None)
+        enrollment_from = parse_date(data["enrollmentFrom"]).replace(tzinfo=None)
+        enrollment_until = parse_date(data["enrollmentUntil"]).replace(tzinfo=None)
         return enrollment_from, enrollment_until
 
     def _load_identity(self):
