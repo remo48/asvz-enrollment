@@ -1,6 +1,8 @@
 # ASVZ Enrollment bot
 This script allows you to automatically enroll in your ASVZ lesson
 
+> **_Note:_** This script is not maintained regularly. It may need some adaptations to be compatible with the latest version of the asvz api. Please reach out to me, if something needs to be changed. 
+
 ## Installation
 You need to install the following:
 - [Python 3](https://www.python.org/downloads/)
