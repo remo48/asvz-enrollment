@@ -88,7 +88,7 @@ class ASVZ:
         while datetime.now() < end_time:
             data = self._get_lesson_status(lesson_id)
 
-            if data["participantsMax"] > data["participantCount"]:
+            if data and data["participantsMax"] > data["participantCount"]:
                 return True
             time.sleep(self.frequency)
 
