@@ -153,7 +153,7 @@ class ASVZ:
         if not self.access_token or datetime.now() > self.expires:
             self._refresh_access_token()
 
-        url = "https://schalter.asvz.ch/tn-api/api/Lessons/{}/enroll".format(lesson_id)
+        url = "https://schalter.asvz.ch/tn-api/api/Lessons/{}/Enrollment".format(lesson_id)
         bearer = "Bearer {}".format(self.access_token)
         headers = {"Authorization": bearer}
         res = self.session.post(url, headers=headers)
